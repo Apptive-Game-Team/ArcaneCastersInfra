@@ -3,7 +3,7 @@ name: Docker CI
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'Dockerfile'
       - '*.sh'
@@ -38,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/apptive-game-team/arcane-casters-deployer
+          images: ghcr.io/apptive-game-team/ac-deployer
           tags: |
             type=raw,value=latest
             type=sha,format=short
