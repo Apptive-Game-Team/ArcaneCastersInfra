@@ -17,7 +17,7 @@
 # is where dev-game itself is defined.
 
 x-slot: &slot
-  image: ghcr.io/apptive-game-team/arcane-casters-game:dev
+  image: ghcr.io/apptive-game-team/ac-game:dev
   # A drained server exits 0 on purpose. Under `always` docker would read that
   # as a crash and bring the old version straight back up.
   restart: on-failure:3

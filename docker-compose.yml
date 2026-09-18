@@ -11,7 +11,7 @@
 x-deployer: &deployer
   # Built and pushed by .github/workflows/docker-ci.yml. `build` stays so
   # `docker compose up --build` still works when testing a local change.
-  image: ${DEPLOYER_IMAGE:-ghcr.io/apptive-game-team/arcane-casters-deployer:latest}
+  image: ${DEPLOYER_IMAGE:-ghcr.io/apptive-game-team/ac-deployer:latest}
   # `build` is for working on the deployer from a checkout of this repository.
   # The host only needs this file, .env and slots/ — swap.sh and the rest are
   # baked into the image by CI.
@@ -47,7 +47,7 @@ services:
     container_name: ac-game-deployer
     environment:
       <<: *endpoints
-      IMAGE: ${AC_GAME_IMAGE:-ghcr.io/apptive-game-team/arcane-casters-game:latest}
+      IMAGE: ${AC_GAME_IMAGE:-ghcr.io/apptive-game-team/ac-game:latest}
       GROUP_LABEL: wordonline.group=ac-game
       CICD_TOKEN: ${AC_CICD_TOKEN}
       DISCORD_WEBHOOK_URL: ${AC_DISCORD_WEBHOOK_URL:-${DISCORD_WEBHOOK_URL:-}}
@@ -64,7 +64,7 @@ services:
     container_name: dev-game-deployer
     environment:
       <<: *endpoints
-      IMAGE: ${DEV_GAME_IMAGE:-ghcr.io/apptive-game-team/arcane-casters-game:dev}
+      IMAGE: ${DEV_GAME_IMAGE:-ghcr.io/apptive-game-team/ac-game:dev}
       GROUP_LABEL: wordonline.group=dev-game
       CICD_TOKEN: ${DEV_CICD_TOKEN}
       DISCORD_WEBHOOK_URL: ${DEV_DISCORD_WEBHOOK_URL:-${DISCORD_WEBHOOK_URL:-}}

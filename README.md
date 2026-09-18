@@ -93,7 +93,7 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   -e BLUE_DOMAIN=blue.game.ac.theevilent.com \
   -e GREEN_DOMAIN=green.game.ac.theevilent.com \
   --entrypoint /usr/local/bin/seed.sh \
-  ghcr.io/apptive-game-team/arcane-casters-deployer:latest
+  ghcr.io/apptive-game-team/ac-deployer:latest
 ```
 
 Both slots are created stopped. The source container keeps running and serving
@@ -111,7 +111,7 @@ project does not treat the clones as its own service and remove them.
 The host needs three things from this repository: `docker-compose.yml`, the
 `.env` beside it, and `slots/` while the slots are being created. `swap.sh` and
 the rest are the image's source — CI bakes them into
-`arcane-casters-deployer`, and the host only pulls that.
+`ac-deployer`, and the host only pulls that.
 
 1. Create `.env` from `env/deployer.env.example` with the image tags and a
    `CICD_TOKEN` per environment (a JWT carrying the `WORDONLINE_CICD`
@@ -203,8 +203,8 @@ from this directory.
 
 | Image | Built by |
 |-------|----------|
-| `ghcr.io/apptive-game-team/arcane-casters-game` | WordOnlineServer — `latest` from `deploy`, `dev` from `main` |
-| `ghcr.io/apptive-game-team/arcane-casters-deployer` | this repository, on every push touching `game/` |
+| `ghcr.io/apptive-game-team/ac-game` | WordOnlineServer — `latest` from `v*` release tag, `dev` from `dev` |
+| `ghcr.io/apptive-game-team/ac-deployer` | this repository, on every push touching `game/` |
 
 Both are private. The host needs `docker login ghcr.io` with a `read:packages`
 token before either can be pulled.
