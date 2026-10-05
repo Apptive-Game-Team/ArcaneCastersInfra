@@ -5,7 +5,8 @@
 #   sudo ./bootstrap.sh <login-user>
 #
 # Installs Docker Engine from Docker's apt repository, adds a 2 GB swap file,
-# and lets <login-user> run docker without sudo. Safe to run twice.
+# lets <login-user> run docker without sudo, and installs game-deploy.timer,
+# which runs rolling-deploy.sh every minute. Safe to run twice.
 
 set -euo pipefail
 
@@ -40,6 +41,31 @@ if ! command -v docker >/dev/null; then
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 fi
+
+dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+cat > /etc/systemd/system/game-deploy.service <<UNIT
+[Unit]
+Description=Replace the game container when its image changes
+After=docker.service
+
+[Service]
+Type=oneshot
+User=${user}
+ExecStart=${dir}/rolling-deploy.sh
+UNIT
+cat > /etc/systemd/system/game-deploy.timer <<UNIT
+[Unit]
+Description=Poll for a new game image
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=${POLL_SECONDS:-60}s
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now game-deploy.timer
 
 usermod -aG docker "$user"
 systemctl enable --now docker
