@@ -25,13 +25,18 @@ services:
       # Inside the container the ports are fixed; only the published ones move.
       PORT: 8080
       MANAGEMENT_PORT: 8081
-      EXTERNAL_PORT: ${PUBLIC_PORT:-7080}
-      INTERNAL_BASE_URL: http://${GAME_NAME:-dev-game}:8080
+      # What clients are told to connect to. Behind nginx on 443 that is 443, not
+      # the loopback port below.
+      EXTERNAL_PORT: ${EXTERNAL_PORT:-7080}
+      # How the lobby reaches this server. The lobby runs on another host, so this
+      # is the public address, not a docker network name.
+      INTERNAL_BASE_URL: ${INTERNAL_BASE_URL:-http://${GAME_NAME:-dev-game}:8080}
       # The image's default heap is a quarter of host memory, which on a 1 GB
       # host leaves the container no room for metaspace and thread stacks.
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx${JAVA_HEAP_MB:-320}m -Xss512k -XX:MaxMetaspaceSize=128m
     ports:
-      - "${PUBLIC_PORT:-7080}:8080"
+      # Loopback only; nginx terminates TLS and proxies here.
+      - "127.0.0.1:${PUBLIC_PORT:-7080}:8080"
       - "127.0.0.1:${MANAGEMENT_PORT:-7081}:8081"
     mem_limit: 640m
 
