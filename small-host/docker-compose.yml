@@ -1,0 +1,45 @@
+# Game server for a host with about 1 GB of memory.
+#
+# The blue/green deployer in ../docker-compose.yml needs two JVMs up during a
+# swap, which does not fit. rolling-deploy.sh does the swap one JVM at a time
+# instead: it puts the running server into DRAINING, waits for its last match to
+# end and the container to exit on its own, then starts the new image. While it
+# waits, this host takes no new matches and the lobby places them elsewhere.
+#
+# Run from this directory with game.env and .env beside this file.
+
+services:
+  game:
+    image: ${GAME_IMAGE:-ghcr.io/apptive-game-team/ac-game:dev}
+    container_name: ${GAME_NAME:-dev-game}
+    # A drained server exits 0 on purpose. unless-stopped and always would read
+    # that as something to undo and bring the old image straight back.
+    restart: on-failure:3
+    networks:
+      - net
+    env_file:
+      - game.env
+    volumes:
+      - ./keys:/keys:ro
+    environment:
+      # Inside the container the ports are fixed; only the published ones move.
+      PORT: 8080
+      MANAGEMENT_PORT: 8081
+      # What clients are told to connect to. Behind nginx on 443 that is 443, not
+      # the loopback port below.
+      EXTERNAL_PORT: ${EXTERNAL_PORT:-7080}
+      # How the lobby reaches this server. The lobby runs on another host, so this
+      # is the public address, not a docker network name.
+      INTERNAL_BASE_URL: ${INTERNAL_BASE_URL:-http://${GAME_NAME:-dev-game}:8080}
+      # The image's default heap is a quarter of host memory, which on a 1 GB
+      # host leaves the container no room for metaspace and thread stacks.
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx${JAVA_HEAP_MB:-320}m -Xss512k -XX:MaxMetaspaceSize=128m
+    ports:
+      # Loopback only; nginx terminates TLS and proxies here.
+      - "127.0.0.1:${PUBLIC_PORT:-7080}:8080"
+      - "127.0.0.1:${MANAGEMENT_PORT:-7081}:8081"
+    mem_limit: 640m
+
+networks:
+  net:
+    name: net
