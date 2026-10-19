@@ -1,0 +1,41 @@
+# The Rust game server (ArcaneCastersGameRust) on dev, one container.
+#
+#   docker compose -f dev-game-rust.yml up -d
+#
+# It runs beside the Java dev-game slots and registers its own hostname, so the
+# lobby spreads dev matches across Java and Rust. It is not a blue/green group:
+# no deployer watches it, so a new image is taken with the command above after
+# `docker pull`. Give it a second slot and a deployer once it replaces dev-game.
+#
+# It reads the same env file as the dev-game slots (dev database, account
+# server, lobby, service token) and overrides only what is its own.
+
+services:
+  dev-game-rust:
+    image: ghcr.io/apptive-game-team/ac-game-rust:dev
+    container_name: dev-game-rust
+    # A drained server exits 0 on purpose; see dev-game.yml.
+    restart: on-failure:5
+    networks:
+      - net
+    env_file:
+      - /home/ubuntu/deploy/dev/ac-test/.env.game
+    environment:
+      DOMAIN: rust.game.dev.ac.theevilent.com
+      # lobby 가 docker network `net` 으로 붙는 주소. DOMAIN 은 클라이언트가 붙는 주소다.
+      INTERNAL_BASE_URL: http://dev-game-rust:8080
+      # The Java slots already run the dev bot matches.
+      BOT_AUTO_MATCH_ENABLED: "false"
+      MANAGEMENT_PORT: 8081
+      RUST_LOG: info
+    volumes:
+      - /home/ubuntu/deploy/dev/ac-test/keys:/keys:ro
+    # Idle it uses about 16 MB; the Java slots use about 380 MB.
+    mem_limit: 256m
+    labels:
+      wordonline.group: dev-game-rust
+      com.centurylinklabs.watchtower.enable: "false"
+
+networks:
+  net:
+    external: true

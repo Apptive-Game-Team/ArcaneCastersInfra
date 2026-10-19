@@ -53,6 +53,14 @@ environment variables across redeploys — once set, they follow the container
 to the next version — but already-running containers do not pick up environment
 changes until they are recreated.
 
+## The Rust game server on dev
+
+`slots/dev-game-rust.yml` runs one more dev game server, the Rust port
+(`ac-game-rust`), as the single container `dev-game-rust` on
+`rust.game.dev.ac.theevilent.com`. It is outside the blue/green groups — no
+deployer watches it — and the lobby spreads dev matches across it and the Java
+slots. It reads the dev-game env file and overrides its own address.
+
 ## How a slot is defined
 
 Nowhere in this repository. A slot is defined by its own container.
