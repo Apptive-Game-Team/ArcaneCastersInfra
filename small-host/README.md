@@ -1,4 +1,4 @@
-# Small host: game server, one JVM at a time
+# Small host: game server, one at a time
 
 For a host with about 1 GB of memory, such as the `google` e2-micro. The
 blue/green deployer in the repository root needs two game servers up during a
@@ -38,9 +38,24 @@ while the previous one still waits.
 
 ## Memory
 
-| | Limit |
-|---|---|
-| game (JVM heap 320 MB, metaspace 128 MB) | 640 MB |
+| Image | Idle use | Limit |
+|---|---|---|
+| `ac-game-rust` (Rust) | about 16 MB | 256 MB (`GAME_MEM_LIMIT`) |
+| `ac-game` (Java, heap 320 MB, metaspace 128 MB) | about 440 MB | 640 MB |
 
-The rest of the 964 MB goes to the OS; the swap file absorbs spikes. Change the
-heap with `JAVA_HEAP_MB` in `.env`.
+The Java image did not fit: with the Google agents and Docker the host needed
+about 970 MB, so half of the JVM sat in swap and the game loop stalled for 12
+seconds at a time. The Rust image leaves most of the 964 MB free. Change the
+Java heap with `JAVA_HEAP_MB` in `.env`.
+
+## Switching between the Rust and Java images
+
+Both images speak the same contracts, so the switch is an `.env` edit:
+
+1. Set `GAME_IMAGE` to `ghcr.io/apptive-game-team/ac-game-rust:latest` and
+   `GAME_MEM_LIMIT=256m` (or back to `ac-game:latest` and `640m`).
+2. The next timer tick pulls the image, drains the running server and starts the
+   other one. Run `./rolling-deploy.sh` to do it at once.
+
+The host must be able to pull `ac-game-rust` (`docker login ghcr.io` with
+`read:packages`, as for `ac-game`).
