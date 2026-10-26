@@ -31,14 +31,17 @@ services:
       # How the lobby reaches this server. The lobby runs on another host, so this
       # is the public address, not a docker network name.
       INTERNAL_BASE_URL: ${INTERNAL_BASE_URL:-http://${GAME_NAME:-dev-game}:8080}
-      # The image's default heap is a quarter of host memory, which on a 1 GB
-      # host leaves the container no room for metaspace and thread stacks.
+      # Java image only; the Rust image ignores it. The image's default heap is
+      # a quarter of host memory, which on a 1 GB host leaves the container no
+      # room for metaspace and thread stacks.
       JAVA_TOOL_OPTIONS: -Xms128m -Xmx${JAVA_HEAP_MB:-320}m -Xss512k -XX:MaxMetaspaceSize=128m
     ports:
       # Loopback only; nginx terminates TLS and proxies here.
       - "127.0.0.1:${PUBLIC_PORT:-7080}:8080"
       - "127.0.0.1:${MANAGEMENT_PORT:-7081}:8081"
-    mem_limit: 640m
+    # 640m fits the Java image. The Rust image idles at about 16 MB; set
+    # GAME_MEM_LIMIT=256m in .env when GAME_IMAGE is the Rust one.
+    mem_limit: ${GAME_MEM_LIMIT:-640m}
 
 networks:
   net:

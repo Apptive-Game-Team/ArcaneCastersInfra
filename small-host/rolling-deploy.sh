@@ -43,7 +43,12 @@ notify() {
 
 is_running() { [ "$(docker inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" = true ]; }
 
-docker pull -q "$IMAGE" >/dev/null
+# An image that is only loaded on this host (docker load) has no registry to
+# pull from; use the local copy then, and fail only when neither exists.
+if ! docker pull -q "$IMAGE" >/dev/null 2>&1; then
+    docker image inspect "$IMAGE" >/dev/null || { log "image ${IMAGE} neither pulls nor exists locally"; exit 1; }
+    log "pull of ${IMAGE} failed; using the local image"
+fi
 new_id="$(docker image inspect -f '{{.Id}}' "$IMAGE")"
 
 if is_running; then
