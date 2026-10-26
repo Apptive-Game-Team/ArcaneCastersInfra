@@ -1,0 +1,31 @@
+# dev-game-rust.yml에 명시적으로 합칠 때만 모델을 활성화합니다.
+services:
+  dev-game-rust:
+    networks:
+      - net
+      - inference
+    environment:
+      LEARNED_BOT_CONFIG: /learned-bot/game-config.json
+      LEARNED_BOT_URL: http://model-bot:18743/infer
+      LEARNED_BOT_TOKEN_FILE: /run/secrets/bot-token
+      LEARNED_BOT_TIMEOUT_MS: "300"
+      LEARNED_BOT_MAX_AGE_MS: "1000"
+      LEARNED_BOT_INTERVAL_MS: "500"
+      LEARNED_BOT_WORKERS: "2"
+    volumes:
+      - type: bind
+        source: ${LEARNED_BOT_MODELS:?모델 디렉터리가 필요합니다}
+        target: /learned-bot
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LEARNED_BOT_TOKEN_FILE:?토큰 파일이 필요합니다}
+        target: /run/secrets/bot-token
+        read_only: true
+        bind:
+          create_host_path: false
+networks:
+  inference:
+    name: ${LEARNED_BOT_NETWORK:?내부 network name이 필요합니다}
+    external: true
