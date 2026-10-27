@@ -2,11 +2,13 @@
 
 Rust 게임 서버와 별도 CPU 추론 컨테이너를 실행합니다. 기본 compose에는 연결하지 않았습니다. 이 설정은 학습 작업을 실행하지 않으며, 검증한 v9 bundle을 읽기 전용으로 로드합니다.
 
+기존 dev blue/green 슬롯에는 [CI/CD 배포 경로](CICD.md)를 사용합니다. 아래 compose 경로는 별도 `dev-game-rust` 인스턴스를 수동으로 준비할 때만 사용합니다.
+
 `compose.yml`은 포트를 publish하지 않는 전용 `internal: true` 네트워크를 만듭니다. 서비스는 `model-bot` hostname으로 해석되는 자기 내부 인터페이스에만 바인딩합니다. 게임 서버만 이 네트워크에 추가하며 토큰으로 요청을 인증합니다. dev와 운영은 network name·토큰·모델 디렉터리·Compose project name을 모두 분리하세요. 인터넷에 직접 노출하는 구성이 아닙니다.
 
 ## dev에서 활성화
 
-1. Bot 저장소의 수동 `inference-image` workflow나 `Dockerfile.inference`로 이미지를 빌드하고 digest를 고정합니다. 모델 bundle은 검증 후 새 디렉터리에 복사합니다. `game-config.json`의 assignments에 기존 활성 봇 ID 한 개부터 지정합니다.
+1. Bot 저장소의 `inference-image` workflow나 `Dockerfile.inference`로 이미지를 빌드하고 digest를 고정합니다. 모델 bundle은 검증 후 새 디렉터리에 복사합니다. `game-config.json`의 assignments에 기존 활성 봇 ID 한 개부터 지정합니다.
 2. `runtime.env.example`을 `runtime.env`로 복사해 이미지와 절대 경로를 채웁니다. 32자 이상의 무작위 토큰을 파일로 준비하고, UID 10001인 추론 컨테이너와 게임 컨테이너만 읽을 수 있게 권한을 설정합니다. 실제 토큰·env·체크포인트는 커밋하지 않습니다.
 3. 저장소 루트에서 설정을 확인한 뒤 모델 서비스부터 시작합니다.
 

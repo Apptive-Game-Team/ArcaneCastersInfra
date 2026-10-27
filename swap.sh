@@ -31,6 +31,17 @@ fi
 IMAGE="${IMAGE:?IMAGE is required}"
 CICD_TOKEN="${CICD_TOKEN:?CICD_TOKEN is required}"
 
+# 모델을 활성화한 dev는 검증된 배포 계획의 game 이미지까지 함께 고정합니다.
+learned_identity=""
+if [ -n "${LEARNED_BOT_PLAN:-}" ]; then
+    [ "${GROUP_LABEL:-}" = wordonline.group=dev-game ]
+    : "${LEARNED_BOT_SERVER_TOKEN_FILE:?}"
+    test -s "$LEARNED_BOT_SERVER_TOKEN_FILE"
+    IMAGE="$(jq -er '.game_image' "$LEARNED_BOT_PLAN")"
+    learned_identity="$(jq -er '.identity' "$LEARNED_BOT_PLAN")"
+    python3 /usr/local/lib/learned-bot/release.py probe "$LEARNED_BOT_PLAN"
+fi
+
 # Every container carrying this label belongs to this deployer. Each
 # environment on the host needs its own value, otherwise one deployer treats
 # the other's slots as its own and drains them.
@@ -108,6 +119,22 @@ running_image_id() {
     docker inspect -f '{{.Image}}' "$1" 2>/dev/null || true
 }
 
+matches_release() {
+    [ "$(running_image_id "$1")" = "$new_image_id" ] || return 1
+    [ -z "$learned_identity" ] || [ "$(docker inspect -f '{{index .Config.Labels "wordonline.learned-release"}}' "$1")" = "$learned_identity" ]
+}
+
+wait_learned() {
+    [ -n "$learned_identity" ] || return 0
+    local name="$1" token
+    token="$(cat "$LEARNED_BOT_SERVER_TOKEN_FILE")"
+    [[ "$token" =~ ^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]] || return 1
+    # 토큰은 curl argv와 출력에 넣지 않습니다. 이 파일은 WORDONLINE_SERVER 권한입니다.
+    printf 'header = "Authorization: Bearer %s"\n' "$token" |
+        curl -sf --max-time 10 --config - "http://${name}:${CONTAINER_PORT}/api/server/learned-bots" |
+        jq -e --slurpfile plan "$LEARNED_BOT_PLAN" '. == $plan[0].assignments' >/dev/null
+}
+
 # Rebuild a container under the same name from its own config, on a new image.
 #
 # A container's inspected config mixes two things: what was asked for at create
@@ -165,6 +192,9 @@ recreate() {
         return 1
     fi
 
+    if [ -n "$learned_identity" ]; then
+        python3 /usr/local/lib/learned-bot/release.py patch "$LEARNED_BOT_PLAN" --payload "$payload" || return 1
+    fi
     docker rm "$name" >/dev/null
 
     if ! api POST "/containers/create?name=${name}" \
@@ -226,8 +256,16 @@ retire() {
             docker stop -t 5 "$name" >/dev/null 2>&1 || true
             return 0
         fi
+        if [ -n "$learned_identity" ]; then
+            notify "${name} drain timeout; keeping both slots and model services for retry"
+            return 1
+        fi
         notify "${name} still had sessions after $((DRAIN_TIMEOUT / 60))m; stopping it"
     else
+        if [ -n "$learned_identity" ]; then
+            notify "${name} drain failed; keeping both slots and model services for retry"
+            return 1
+        fi
         notify "could not put ${name} into DRAINING; stopping it after ${STOP_GRACE}s grace"
     fi
 
@@ -265,11 +303,19 @@ fi
 if [ "${#running[@]}" -gt 1 ]; then
     keeper=""
     for name in "${running[@]}"; do
-        if [ "$(running_image_id "$name")" = "$new_image_id" ]; then
+        if matches_release "$name"; then
             keeper="$name"
             break
         fi
     done
+    if [ -n "$learned_identity" ]; then
+        if [ -z "$keeper" ]; then
+            notify "no running slot matches the requested model release; refusing to drain"
+            exit 1
+        fi
+        wait_healthy "$keeper" && wait_learned "$keeper" || exit 1
+        sleep "$SETTLE_DELAY"
+    fi
     keeper="${keeper:-${running[0]}}"
 
     notify "${#running[@]} slots running; resuming interrupted swap, keeping ${keeper}"
@@ -281,7 +327,8 @@ fi
 
 live="${running[0]:-}"
 
-if [ -n "$live" ] && [ "$(running_image_id "$live")" = "$new_image_id" ]; then
+if [ -n "$live" ] && matches_release "$live"; then
+    wait_learned "$live" || exit 1
     log "${live} already runs the current image; nothing to do"
     exit 0
 fi
@@ -291,7 +338,10 @@ if [ -z "$live" ]; then
     target="${idle[0]}"
     notify "no slot is running; restarting ${target} on the current image"
     recreate "$target" "$new_image_id" || exit 1
-    wait_healthy "$target" || exit 1
+    if ! wait_healthy "$target" || ! wait_learned "$target"; then
+        docker stop -t 10 "$target" >/dev/null 2>&1 || true
+        exit 1
+    fi
     notify "${target} is live"
     exit 0
 fi
@@ -317,7 +367,7 @@ if ! recreate "$target" "$new_image_id"; then
     exit 1
 fi
 
-if ! wait_healthy "$target"; then
+if ! wait_healthy "$target" || ! wait_learned "$target"; then
     notify "${target} failed to become healthy; keeping ${live}. Last logs:"
     docker logs --tail 50 "$target" 2>&1 || true
     docker stop -t 10 "$target" >/dev/null 2>&1 || true
