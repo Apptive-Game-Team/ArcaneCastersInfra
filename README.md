@@ -220,3 +220,9 @@ token before either can be pulled.
 Not filled in yet: compose for `lobby`, `account`, `admin` and `website`,
 the watchtower service that keeps those up to date, and the Prometheus scrape
 configuration. Those need the files currently living on the server.
+
+## 매칭용 모델 봇
+
+Rust 게임 서버에 별도 CPU 추론 서비스를 연결하는 선택적 구성은
+[모델 서비스 배치](learned-bot/README.md)에 정리했습니다. 전용 내부 네트워크,
+읽기 전용 모델·토큰 mount, 자원 제한과 dev overlay를 포함합니다.

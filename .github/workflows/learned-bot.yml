@@ -1,0 +1,60 @@
+name: learned-bot
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: '검토한 learned-bot/releases/<name>.json 경로'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: learned-bot-dev
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s learned-bot/tests -v
+      - run: bash -n swap.sh learned-bot/deploy.sh
+      - run: docker build -t ac-deployer:check .
+      - run: docker run --rm --network none --entrypoint python3 -v "$PWD/learned-bot/tests:/tests:ro" ac-deployer:check -m unittest discover -s /tests -v
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev'
+    needs: verify
+    environment: learned-bot-dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 검토한 release 파일 선택
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          [[ "$RELEASE" =~ ^learned-bot/releases/[a-z0-9][a-z0-9-]{0,39}\.json$ ]]
+          test -f "$RELEASE" && test ! -L "$RELEASE"
+          cp "$RELEASE" "$RUNNER_TEMP/release.json"
+      - name: dev 배포 접속 설정
+        env:
+          SSH_KEY: ${{ secrets.DEV_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEV_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/*
+      - name: 모델 후보 검사와 game 슬롯 전환
+        env:
+          HOST: ${{ secrets.DEV_DEPLOY_HOST }}
+          USER: ${{ secrets.DEV_DEPLOY_USER }}
+        run: |
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$USER@$HOST" \
+            'docker exec -i dev-game-deployer sh -c '\''umask 077; f=$(mktemp /var/lib/learned-bot/incoming.XXXXXX); cat > "$f"; /usr/local/bin/deploy-learned-bot.sh "$f"; result=$?; rm -f "$f"; exit "$result"'\''' \
+            < "$RUNNER_TEMP/release.json"
+      - name: 임시 SSH 키 제거
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts

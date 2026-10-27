@@ -1,0 +1,44 @@
+# 환경마다 별도 project name, 모델 디렉터리, 토큰과 network name을 사용합니다.
+services:
+  model-bot:
+    image: ${LEARNED_BOT_IMAGE:?digest로 고정한 추론 이미지가 필요합니다}
+    hostname: model-bot
+    restart: unless-stopped
+    # 이 이름은 이 컨테이너의 전용 내부 인터페이스로 해석됩니다.
+    command: ["--registry", "/models/registry.json", "--token-file", "/run/secrets/bot-token", "--host", "model-bot", "--port", "18743"]
+    networks: [inference]
+    # 호스트에 포트를 공개하지 않습니다. 다른 네트워크에도 연결하지 않습니다.
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    cpus: ${LEARNED_BOT_CPUS:-1.0}
+    mem_limit: ${LEARNED_BOT_MEMORY:-768m}
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    volumes:
+      - type: bind
+        source: ${LEARNED_BOT_MODELS:?검증한 모델 디렉터리가 필요합니다}
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LEARNED_BOT_TOKEN_FILE:?환경별 토큰 파일이 필요합니다}
+        target: /run/secrets/bot-token
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://model-bot:18743/health', timeout=2).close()"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+networks:
+  inference:
+    name: ${LEARNED_BOT_NETWORK:?환경별 내부 network name이 필요합니다}
+    internal: true
