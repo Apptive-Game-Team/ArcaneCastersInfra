@@ -22,7 +22,9 @@ docker compose --env-file learned-bot/runtime.env -f slots/dev-game-rust.yml -f 
 docker compose --env-file learned-bot/runtime.env -f slots/dev-game-rust.yml -f slots/dev-game-rust.learned.yml up -d
 ```
 
-로비는 기존 방식으로 봇과 게임 서버를 선택합니다. dev에서 Java와 Rust 서버가 함께 등록되어 있으면 Rust가 맡은 경기에서만 모델을 사용합니다. `BOT_AUTO_MATCH_ENABLED=false`는 유지하며 자동 봇 경기 생성까지 켜지 않습니다.
+로비에도 동일한 `game-config.json` 파일만 읽기 전용으로 mount하고 `LEARNED_BOT_CONFIG=/learned-bot/game-config.json`을 설정합니다. 로비에는 checkpoint나 추론 토큰, inference network가 필요 없습니다. 로비의 모델 가용성 변경을 먼저 배포하고 assignments를 설정한 뒤 게임 서버에서 모델을 활성화하세요. 준비 상태 API가 없는 Java·구버전 서버에는 모델 봇을 배치하지 않으며 일반 봇과 사람 매칭은 유지합니다. `BOT_AUTO_MATCH_ENABLED=false`는 유지하며 자동 봇 경기 생성까지 켜지 않습니다.
+
+추론 서비스의 `GET /models`는 인증 후 실제 로드된 descriptor를 반환합니다. 게임 서버가 계약을 대조하고 로비에는 준비된 봇 ID와 버전만 공개합니다. 서비스가 꺼져 있거나 모델이 누락되면 신규 모델 봇 매칭을 제외합니다. 이때 로비와 게임 서버의 assignments는 지우지 않습니다. 모델이 없는 상태를 일반 봇으로 잘못 해석하지 않도록 식별 목록을 유지해야 합니다.
 
 ## 자원과 운영 전환
 
@@ -34,4 +36,4 @@ docker compose --env-file learned-bot/runtime.env -f slots/dev-game-rust.yml -f 
 
 모델 서비스의 Watchtower는 꺼져 있습니다. 서비스 교체 전 새 registry에 이전 버전과 새 버전을 함께 넣고, 새 descriptor를 읽는 게임 슬롯을 배포합니다. 이전 게임 슬롯의 drain 완료 뒤 이전 모델을 제거합니다. registry의 artifact 경로는 각 bundle 하위 디렉터리를 가리킬 수 있습니다. 같은 버전의 내용·hash를 덮어쓰지 마세요.
 
-롤백은 모델 서비스를 내려 즉시 RULE로 전환하거나, drain 후 모델 overlay 없이 게임 서버를 재생성합니다. 이전 descriptor를 사용하는 서버가 남은 동안 그 모델을 제거하면 해당 경기들은 RULE로 전환됩니다. 게임 서버의 health는 추론 서비스 장애와 분리되어 있습니다.
+모델 서비스를 내리면 신규 모델 봇 매칭은 차단되고 진행 중 경기는 RULE로 이어갑니다. 일반 봇으로 되돌릴 때는 로비와 게임 서버 양쪽의 assignments를 제거하고 게임 서버를 drain합니다. 게임 서버의 health는 추론 서비스 장애와 분리되어 있습니다.
