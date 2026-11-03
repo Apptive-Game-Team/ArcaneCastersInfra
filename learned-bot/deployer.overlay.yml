@@ -1,0 +1,13 @@
+# 최초 한 번 dev deployer에 합칩니다. 호스트 경로와 컨테이너 경로를 동일하게 유지합니다.
+services:
+  dev-game-deployer:
+    environment:
+      LEARNED_BOT_PLAN: /var/lib/learned-bot/active.json
+      LEARNED_BOT_BUNDLE_ROOT: ${LEARNED_BOT_BUNDLE_ROOT:?}
+      LEARNED_BOT_TOKEN_FILE: ${LEARNED_BOT_TOKEN_FILE:?}
+      LEARNED_BOT_SERVER_TOKEN_FILE: /run/secrets/learned-server-token
+    volumes:
+      - ${LEARNED_BOT_BUNDLE_ROOT}:${LEARNED_BOT_BUNDLE_ROOT}:ro
+      - ${LEARNED_BOT_TOKEN_FILE}:${LEARNED_BOT_TOKEN_FILE}:ro
+      - ${LEARNED_BOT_SERVER_TOKEN_FILE}:/run/secrets/learned-server-token:ro
+      - ${LEARNED_BOT_STATE_DIR}:/var/lib/learned-bot

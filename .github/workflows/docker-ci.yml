@@ -7,11 +7,13 @@ on:
     paths:
       - 'Dockerfile'
       - '*.sh'
+      - 'learned-bot/**'
       - '.github/workflows/docker-ci.yml'
   workflow_dispatch:
 
 jobs:
   build-and-push:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,3 +54,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s learned-bot/tests -v
+      - run: bash -n swap.sh learned-bot/deploy.sh
+      - run: docker build -t ac-deployer:check .
+      - run: docker run --rm --network none --entrypoint python3 -v "$PWD/learned-bot/tests:/tests:ro" ac-deployer:check -m unittest discover -s /tests -v

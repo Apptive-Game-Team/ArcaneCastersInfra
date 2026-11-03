@@ -1,0 +1,8 @@
+{
+  "release": "candidate-v9-001",
+  "image": "ghcr.io/apptive-game-team/ac-model-bot@sha256:REPLACE_WITH_ARM64_IMAGE_DIGEST",
+  "game_image": "ghcr.io/apptive-game-team/ac-game-rust@sha256:REPLACE_WITH_COMPATIBLE_GAME_DIGEST",
+  "registry_sha256": "REPLACE_WITH_REGISTRY_JSON_SHA256",
+  "game-config_sha256": "REPLACE_WITH_GAME_CONFIG_JSON_SHA256",
+  "smoke_sha256": "REPLACE_WITH_SMOKE_JSON_SHA256"
+}
